@@ -8,7 +8,7 @@ using Microsoft.Framework.Logging;
 
 namespace Server
 {
-    public class WebSocketHandler
+    public class WebSocketHandler : IWebSocketHandler
     {
         private static readonly TimeSpan _closeTimeout = TimeSpan.FromMilliseconds(250);  // Wait 250 ms before giving up on a Close
         private const int _receiveLoopBufferSize = 2 * 1024; // 4KB default fragment size (we expect most messages to be very short)
@@ -16,18 +16,19 @@ namespace Server
         private readonly ILogger _logger;
         private readonly TaskQueue _sendQueue = new TaskQueue(); // Queue for sending messages
         private readonly MemoryPool _memoryPool;
+        private WebSocket _webSocket;
 
-        public WebSocketHandler(MemoryPool memoryPool, ILogger logger)
-            : this(memoryPool, logger, null)
+        public WebSocketHandler(MemoryPool memoryPool, ILoggerFactory loggerFactory)
+            : this(memoryPool, loggerFactory, null)
         {
             
         }
 
-        public WebSocketHandler(MemoryPool memoryPool, ILogger logger, int? maxIncomingMessageSize)
+        public WebSocketHandler(MemoryPool memoryPool, ILoggerFactory loggerFactory, int? maxIncomingMessageSize)
         {
             _maxIncomingMessageSize = maxIncomingMessageSize;
             _memoryPool = memoryPool;
-            _logger = logger;
+            _logger = loggerFactory.CreateLogger<WebSocketHandler>();
             
             OnOpenAction = () => { };
             OnMessageTextAction = msg => { };
@@ -36,17 +37,10 @@ namespace Server
             OnErrorAction = e => { };
         }
 
-
-
-        internal WebSocket WebSocket { get; set; }
-
         public int? MaxIncomingMessageSize { get { return _maxIncomingMessageSize; } }
         
         public Exception Error { get; set; }
-
-
-
-
+        
         public Action OnOpenAction { get; set; }
 
         public Action<string> OnMessageTextAction { get; set; }
@@ -83,12 +77,7 @@ namespace Server
         {
             OnCloseAction();
         }
-
-
-
-
-
-
+        
         public Task SendAsync(string message)
         {
             var buffer = Encoding.UTF8.GetBytes(message);
@@ -97,7 +86,7 @@ namespace Server
 
         public virtual Task SendAsync(ArraySegment<byte> message, WebSocketMessageType messageType, bool endOfMessage = true)
         {
-            if (WebSocket.State != WebSocketState.Open)
+            if (_webSocket.State != WebSocketState.Open)
             {
                 return TaskAsyncHelper.Empty;
             }
@@ -108,14 +97,14 @@ namespace Server
                 {
                     var context = (SendContext)state;
 
-                    if (context.Handler.WebSocket.State != WebSocketState.Open)
+                    if (context.Handler._webSocket.State != WebSocketState.Open)
                     {
                         return;
                     }
 
                     try
                     {
-                        await context.Handler.WebSocket
+                        await context.Handler._webSocket
                               .SendAsync(context.Message, context.MessageType, context.EndOfMessage, CancellationToken.None)
                               .PreserveCulture();
                     }
@@ -130,7 +119,7 @@ namespace Server
 
         public virtual Task CloseAsync()
         {
-            if (IsClosedOrClosedSent(WebSocket))
+            if (IsClosedOrClosedSent(_webSocket))
             {
                 return TaskAsyncHelper.Empty;
             }
@@ -141,14 +130,14 @@ namespace Server
                 {
                     var context = (CloseContext)state;
 
-                    if (IsClosedOrClosedSent(context.Handler.WebSocket))
+                    if (IsClosedOrClosedSent(context.Handler._webSocket))
                     {
                         return;
                     }
 
                     try
                     {
-                        await context.Handler.WebSocket
+                        await context.Handler._webSocket
                             .CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None)
                             .PreserveCulture();
                     }
@@ -161,8 +150,12 @@ namespace Server
                 closeContext);
         }
 
+        public Task ProcessWebSocketRequestAsync(WebSocket webSocket)
+        {
+            return ProcessWebSocketRequestAsync(webSocket, CancellationToken.None);
+        }
 
-        internal Task ProcessWebSocketRequestAsync(WebSocket webSocket, CancellationToken disconnectToken)
+        public Task ProcessWebSocketRequestAsync(WebSocket webSocket, CancellationToken disconnectToken)
         {
             if (webSocket == null)
             {
@@ -187,7 +180,7 @@ namespace Server
             try
             {
                 // first, set primitives and initialize the object
-                WebSocket = webSocket;
+                _webSocket = webSocket;
 
                 OnOpen();
 
@@ -241,10 +234,7 @@ namespace Server
 
             OnClose();
         }
-
-
-
-
+        
         // returns true if this is a fatal exception (e.g. OnError should be called)
         private static bool IsFatalException(Exception ex)
         {
@@ -270,14 +260,9 @@ namespace Server
 
         private static bool IsClosedOrClosedSent(WebSocket webSocket)
         {
-            return webSocket.State == WebSocketState.Closed ||
-                   webSocket.State == WebSocketState.CloseSent ||
-                   webSocket.State == WebSocketState.Aborted;
+            return webSocket.State == WebSocketState.Closed || webSocket.State == WebSocketState.CloseSent || webSocket.State == WebSocketState.Aborted;
         }
-
         
-
-
         private class CloseContext
         {
             public WebSocketHandler Handler;

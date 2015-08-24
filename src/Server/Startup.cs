@@ -44,16 +44,18 @@ namespace Server
                             badRequest = true;
                         }
                         
-                        var logger = context.ApplicationServices.GetService<ILogger>();
+                        var loggerFactory = context.ApplicationServices.GetService<ILoggerFactory>();
                         var memoryPool = context.ApplicationServices.GetService<MemoryPool>();
-                        var webSocketHandler = new WebSocketHandler(memoryPool, logger);
+
+                        var webSocketHandler = new WebSocketHandler(memoryPool, loggerFactory);
+
                         webSocketHandler.OnMessageTextAction = msg =>
                         {
                             webSocketHandler.SendAsync($"Recieved: {msg}");
                         };
                         
                         // Start the websocket handler so that we can process things over the channel
-                        await webSocketHandler.ProcessWebSocketRequestAsync(webSocket, CancellationToken.None);
+                        await webSocketHandler.ProcessWebSocketRequestAsync(webSocket);
                     }
 
                     if (badRequest)
