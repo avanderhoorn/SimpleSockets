@@ -117,6 +117,7 @@ namespace Server
                 sendContext);
         }
 
+        // TODO: check is this calls OnDisconnect
         public virtual Task CloseAsync()
         {
             if (IsClosedOrClosedSent(_webSocket))
@@ -150,12 +151,12 @@ namespace Server
                 closeContext);
         }
 
-        public Task ProcessWebSocketRequestAsync(WebSocket webSocket)
+        public Task ProcessRequestAsync(WebSocket webSocket)
         {
-            return ProcessWebSocketRequestAsync(webSocket, CancellationToken.None);
+            return ProcessRequestAsync(webSocket, CancellationToken.None);
         }
 
-        public Task ProcessWebSocketRequestAsync(WebSocket webSocket, CancellationToken disconnectToken)
+        public Task ProcessRequestAsync(WebSocket webSocket, CancellationToken disconnectToken)
         {
             if (webSocket == null)
             {
@@ -164,7 +165,7 @@ namespace Server
 
             var receiveContext = new ReceiveContext(webSocket, disconnectToken, MaxIncomingMessageSize, _receiveLoopBufferSize);
 
-            return ProcessWebSocketRequestAsync(webSocket, disconnectToken, state =>
+            return ProcessRequestAsync(webSocket, disconnectToken, state =>
                 {
                     var context = (ReceiveContext)state;
 
@@ -173,7 +174,7 @@ namespace Server
                 receiveContext);
         }
 
-        internal async Task ProcessWebSocketRequestAsync(WebSocket webSocket, CancellationToken disconnectToken, Func<object, Task<WebSocketMessage>> messageRetriever, object state)
+        internal async Task ProcessRequestAsync(WebSocket webSocket, CancellationToken disconnectToken, Func<object, Task<WebSocketMessage>> messageRetriever, object state)
         {
             var closedReceived = false;
 

@@ -20,6 +20,6 @@ namespace Server
 
         Task CloseAsync();
 
-        Task ProcessWebSocketRequestAsync(WebSocket webSocket);
+        Task ProcessRequestAsync(WebSocket webSocket);
     }
 }
