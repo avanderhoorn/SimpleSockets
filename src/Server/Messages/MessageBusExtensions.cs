@@ -10,26 +10,6 @@ namespace Server
 {
     public static class MessageBusExtensions
     {
-        public static Task Publish(this IMessageBus bus, string source, string key, string value)
-        {
-            if (bus == null)
-            {
-                throw new ArgumentNullException("bus");
-            }
-
-            if (source == null)
-            {
-                throw new ArgumentNullException("source");
-            }
-
-            if (String.IsNullOrEmpty(key))
-            {
-                throw new ArgumentNullException("key");
-            }
-
-            return bus.Publish(new Message(source, key, value));
-        }
-
         public static void Enumerate(this IList<ArraySegment<Message>> messages, Action<Message> onMessage)
         {
             if (messages == null)
