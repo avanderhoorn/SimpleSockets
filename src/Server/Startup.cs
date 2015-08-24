@@ -55,7 +55,7 @@ namespace Server
                         };
                         
                         // Start the websocket handler so that we can process things over the channel
-                        await webSocketHandler.ProcessWebSocketRequestAsync(webSocket);
+                        await webSocketHandler.ProcessRequestAsync(webSocket);
                     }
 
                     if (badRequest)
